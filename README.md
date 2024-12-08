@@ -2,6 +2,8 @@
 
 一个用于监控 Docker Hub 镜像更新的自动化工具。通过 GitHub Actions 定期检查指定的 Docker 镜像是否有更新，并记录更新日志。
 
+一直以来 Github自带版本更新提醒的功能，但 DockerHub 没有，于是有了本项目：DockerHub镜像更新提醒。
+
 ## 功能特点
 
 - 🔄 自动检查 Docker Hub 镜像更新
