@@ -62,6 +62,16 @@ hslr/sun-panel:latest
 3. https://hub.docker.com/v2/repositories/0nlylty/dockercopilot/tags/UGREEN
 4. https://hub.docker.com/v2/repositories/linuxserver/transmission/tags/latest
 
+## 更新日志
+
+📋 [点击查看最新的镜像更新记录](logs/changelog.md)
+
+更新日志记录了所有镜像的检查结果，包括：
+- 检查执行时间
+- 每个镜像的当前更新时间
+- 上次检查时间
+- 更新状态
+
 ## 配置通知（可选）
 
 ### 企业微信通知
