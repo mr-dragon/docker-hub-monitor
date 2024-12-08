@@ -47,6 +47,21 @@ hslr/sun-panel:latest
 
 ```
 
+如果没有:版本，默认用latest，格式如下：
+
+1. nginx
+2. cloudnas/clouddrive2
+3. linuxserver/transmission:4.0.5
+4. linuxserver/transmission:UGREEN
+5. linuxserver/transmission:latest
+
+他们的版本更新信息链接分别如下：
+
+1. https://hub.docker.com/v2/repositories/library/nginx/tags/latest
+2. https://hub.docker.com/v2/repositories/linuxserver/transmission/tags/4.0.5
+3. https://hub.docker.com/v2/repositories/0nlylty/dockercopilot/tags/UGREEN
+4. https://hub.docker.com/v2/repositories/linuxserver/transmission/tags/latest
+
 ## 配置通知（可选）
 
 ### 企业微信通知
