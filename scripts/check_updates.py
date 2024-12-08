@@ -108,7 +108,10 @@ def generate_changelog(images_status):
 
 def generate_changelog(images_status):
     os.makedirs('logs', exist_ok=True)
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 设置时区为上海时间
+    shanghai_tz = pytz.timezone('Asia/Shanghai')
+    current_time = datetime.now(shanghai_tz).strftime('%Y-%m-%d %H:%M:%S')
     
     content = [
         f"# Docker Images Update Check - {current_time}\n",
@@ -116,12 +119,29 @@ def generate_changelog(images_status):
     ]
     
     for image, status in images_status.items():
+        # 转换 Docker Hub 返回的 UTC 时间到上海时间
+        current_update_time = parser.parse(status['current_time'])
+        if current_update_time.tzinfo is None:
+            current_update_time = pytz.utc.localize(current_update_time)
+        current_update_time = current_update_time.astimezone(shanghai_tz)
+        
+        # 转换上次检查时间（如果存在）
+        last_update_time = status['last_time']
+        if last_update_time:
+            last_update_time = parser.parse(last_update_time)
+            if last_update_time.tzinfo is None:
+                last_update_time = pytz.utc.localize(last_update_time)
+            last_update_time = last_update_time.astimezone(shanghai_tz)
+            last_time_str = last_update_time.strftime('%Y-%m-%d %H:%M:%S %z')
+        else:
+            last_time_str = '首次检查'
+
         content.append(f"### {image}")
-        content.append(f"- 当前更新时间: {status['current_time']}")
-        content.append(f"- 上次检查时间: {status['last_time'] or '首次检查'}")
+        content.append(f"- 当前更新时间: {current_update_time.strftime('%Y-%m-%d %H:%M:%S %z')}")
+        content.append(f"- 上次检查时间: {last_time_str}")
         content.append(f"- 状态: {'有更新' if status['updated'] else '无更新'}\n")
     
-    changelog_path = 'logs/changelog.md'
+    changelog_path = os.path.join('logs', 'changelog.md')
     # 读取现有的changelog内容
     existing_content = []
     if os.path.exists(changelog_path):
