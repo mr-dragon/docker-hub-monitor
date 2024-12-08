@@ -8,14 +8,21 @@ from email.mime.text import MIMEText
 from email.header import Header
 
 def read_images():
-    # 获取脚本所在目录的路径
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    # 获取项目根目录路径
-    root_dir = os.path.dirname(os.path.dirname(script_dir))
-    # 构建 images.txt 的完整路径
-    images_file = os.path.join(root_dir, 'images.txt')
-    with open(images_file, 'r') as f:
-        return [line.strip() for line in f.readlines() if line.strip()]
+    # 直接从工作目录读取
+    try:
+        with open('images.txt', 'r') as f:
+            return [line.strip() for line in f.readlines() if line.strip()]
+    except FileNotFoundError:
+        # 如果文件不存在，创建一个包含示例镜像的文件
+        example_images = [
+            'nginx',
+            'cloudnas/clouddrive2',
+            'linuxserver/transmission:4.0.5'
+        ]
+        os.makedirs(os.path.dirname('images.txt'), exist_ok=True)
+        with open('images.txt', 'w') as f:
+            f.write('\n'.join(example_images))
+        return example_images
 
 def get_last_updated(image_name):
     filename = f"last_updated/{image_name.replace('/', '_')}.txt"
