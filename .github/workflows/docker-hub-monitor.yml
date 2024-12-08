@@ -2,11 +2,8 @@ name: Monitor Docker Hub Image Updates
 
 on:
   push:
-    # 仅在 imagex.txt 文件更新时触发
     paths:
       - "imagex.txt"
-  workflow_dispatch: # 手动触发
-
 
 jobs:
   monitor-docker-images:
@@ -22,7 +19,7 @@ jobs:
         python-version: '3.x'
 
     - name: Install Dependencies
-      run: pip install requests docker
+      run: pip install requests docker pytz
 
     - name: Monitor Docker Images
       env:
@@ -37,6 +34,8 @@ jobs:
         import requests
         import json
         import subprocess
+        from datetime import datetime
+        import pytz
 
         def get_last_updated(image, platform=None):
             """
@@ -48,10 +47,27 @@ jobs:
                     cmd.extend(["--platform", platform])
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 manifest = json.loads(result.stdout)
-                return manifest["manifests"][0]["platform"]["lastUpdated"]
+                # 解析更新时间和版本信息
+                update_info = manifest.get("manifests", [{}])[0]
+                return {
+                    "last_updated": update_info.get("platform", {}).get("lastUpdated", "Unknown"),
+                    "digest": update_info.get("digest", "Unknown"),
+                }
             except Exception as e:
                 print(f"Failed to fetch manifest for {image}: {e}")
                 return None
+
+        def convert_to_shanghai_time(utc_time):
+            """
+            将 UTC 时间转换为 Asia/Shanghai 时区
+            """
+            try:
+                utc_dt = datetime.strptime(utc_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+                utc_dt = utc_dt.replace(tzinfo=pytz.utc)
+                shanghai_tz = pytz.timezone("Asia/Shanghai")
+                return utc_dt.astimezone(shanghai_tz).strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                return "Unknown"
 
         # 读取镜像列表文件
         image_list_file = os.getenv("IMAGE_LIST_FILE")
@@ -95,10 +111,16 @@ jobs:
             last_update_file = os.path.join(last_update_file_dir, image.replace("/", "_").replace(":", "_") + ".txt")
 
             # 获取镜像更新时间
-            last_updated = get_last_updated(image, platform)
-            if not last_updated:
-                print(f"Failed to fetch update info for {image}. Skipping.")
+            update_info = get_last_updated(image, platform)
+            if not update_info:
+                print(f"[ERROR] Failed to fetch update info for {image}. Skipping.")
                 continue
+
+            last_updated = update_info.get("last_updated", "Unknown")
+            digest = update_info.get("digest", "Unknown")
+
+            # 将更新时间转换为 Asia/Shanghai 时区
+            shanghai_time = convert_to_shanghai_time(last_updated)
 
             # 检查是否有更新
             if os.path.exists(last_update_file):
@@ -107,7 +129,12 @@ jobs:
             else:
                 last_checked = None
 
+            # 打印日志
             if last_checked != last_updated:
+                print(f"[UPDATED] Image: {image}")
+                print(f"  Digest: {digest}")
+                print(f"  Last Updated (UTC): {last_updated}")
+                print(f"  Last Updated (Shanghai): {shanghai_time}")
                 with open(last_update_file, "w") as f:
                     f.write(last_updated)
 
@@ -116,14 +143,16 @@ jobs:
                     payload = {
                         "msgtype": "text",
                         "text": {
-                            "content": f"Docker image {image} has been updated to {last_updated}."
+                            "content": f"[UPDATED] Image: {image}\nDigest: {digest}\nLast Updated (Shanghai): {shanghai_time}"
                         }
                     }
                     headers = {"Content-Type": "application/json"}
                     resp = requests.post(webhook_url, data=json.dumps(payload), headers=headers)
                     if resp.status_code != 200:
-                        print(f"Failed to send webhook for {image}: {resp.status_code} {resp.text}")
-                print(f"Update detected for {image}: {last_updated}")
+                        print(f"[ERROR] Failed to send webhook for {image}: {resp.status_code} {resp.text}")
             else:
-                print(f"No updates for {image}.")
+                print(f"[NO CHANGE] Image: {image}")
+                print(f"  Digest: {digest}")
+                print(f"  Last Updated (UTC): {last_updated}")
+                print(f"  Last Updated (Shanghai): {shanghai_time}")
         EOF
