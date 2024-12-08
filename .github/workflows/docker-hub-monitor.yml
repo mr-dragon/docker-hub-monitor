@@ -1,0 +1,94 @@
+name: Monitor Docker Hub Image Updates
+
+on:
+  schedule:
+    # 每小时检查一次
+    - cron: '0 * * * *'
+
+jobs:
+  monitor-docker-hub:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install Dependencies
+      run: pip install requests
+
+    - name: Check Docker Hub Image Updates
+      env:
+        IMAGE_LIST_FILE: "imagex.txt" # 镜像列表文件
+        LAST_UPDATE_FILE_DIR: ".last_updates" # 存储各镜像的更新时间
+        WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }} # 企业微信或其他通知 Webhook 的密钥
+      run: |
+        python <<EOF
+        import os
+        import requests
+        import json
+
+        # 配置环境变量
+        image_list_file = os.getenv("IMAGE_LIST_FILE")
+        last_update_file_dir = os.getenv("LAST_UPDATE_FILE_DIR")
+        webhook_url = os.getenv("WEBHOOK_URL")
+
+        # 确保目录存在
+        if not os.path.exists(last_update_file_dir):
+            os.makedirs(last_update_file_dir)
+
+        # 读取镜像列表
+        if not os.path.exists(image_list_file):
+            raise Exception(f"Image list file not found: {image_list_file}")
+
+        with open(image_list_file, "r") as f:
+            images = [line.strip() for line in f if line.strip()]
+
+        # 检查每个镜像更新
+        for image in images:
+            api_url = f"https://hub.docker.com/v2/repositories/{image}"
+            response = requests.get(api_url)
+            if response.status_code != 200:
+                print(f"Failed to fetch Docker image metadata for {image}: {response.status_code}")
+                continue
+
+            data = response.json()
+            last_updated = data.get("last_updated")
+
+            # 对应镜像的更新时间文件
+            last_update_file = os.path.join(last_update_file_dir, image.replace("/", "_") + ".txt")
+
+            # 读取之前的更新时间
+            if os.path.exists(last_update_file):
+                with open(last_update_file, "r") as f:
+                    last_checked = f.read().strip()
+            else:
+                last_checked = None
+
+            # 如果更新时间变化，发送通知
+            if last_checked != last_updated:
+                # 更新本地记录的更新时间
+                with open(last_update_file, "w") as f:
+                    f.write(last_updated)
+
+                # 发送通知
+                if webhook_url:
+                    payload = {
+                        "msgtype": "text",
+                        "text": {
+                            "content": f"Docker image {image} has been updated: {last_updated}"
+                        }
+                    }
+                    headers = {"Content-Type": "application/json"}
+                    resp = requests.post(webhook_url, data=json.dumps(payload), headers=headers)
+                    if resp.status_code != 200:
+                        print(f"Failed to send webhook for {image}: {resp.status_code} {resp.text}")
+                else:
+                    print(f"Webhook URL not provided. Update detected for {image}: {last_updated}")
+            else:
+                print(f"No updates for {image}.")
+        EOF
