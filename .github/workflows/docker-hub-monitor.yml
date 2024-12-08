@@ -1,158 +1,42 @@
-name: Monitor Docker Hub Image Updates
+name: Docker Hub Image Monitor
 
 on:
-  push:
-    paths:
-      - "imagex.txt"
+  schedule:
+    - cron: '0 */12 * * *'  # 每12小时执行一次
+  workflow_dispatch:  # 支持手动触发
+
+env:
+  WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}  # 企业微信机器人webhook地址
+  EMAIL_TO: ${{ secrets.EMAIL_TO }}        # 接收通知的邮箱地址
+  EMAIL_FROM: ${{ secrets.EMAIL_FROM }}    # 发送通知的邮箱地址
+  EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}  # 邮箱密码
 
 jobs:
-  monitor-docker-images:
+  check-updates:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-    - name: Install Dependencies
-      run: pip install requests docker pytz
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dateutil
 
-    - name: Monitor Docker Images
-      env:
-        IMAGE_LIST_FILE: "imagex.txt" # 镜像列表文件
-        LAST_UPDATE_FILE_DIR: ".last_updates" # 存储镜像更新时间
-        WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }} # 企业微信或其他 Webhook
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME || '' }} # Docker Hub 用户名（可选）
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD || '' }} # Docker Hub 密码（可选）
-      run: |
-        python <<EOF
-        import os
-        import requests
-        import json
-        import subprocess
-        from datetime import datetime
-        import pytz
-
-        def get_last_updated(image, platform=None):
-            """
-            获取镜像的更新时间
-            """
-            try:
-                cmd = ["docker", "manifest", "inspect", image]
-                if platform:
-                    cmd.extend(["--platform", platform])
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                manifest = json.loads(result.stdout)
-                # 解析更新时间和版本信息
-                update_info = manifest.get("manifests", [{}])[0]
-                return {
-                    "last_updated": update_info.get("platform", {}).get("lastUpdated", "Unknown"),
-                    "digest": update_info.get("digest", "Unknown"),
-                }
-            except Exception as e:
-                print(f"Failed to fetch manifest for {image}: {e}")
-                return None
-
-        def convert_to_shanghai_time(utc_time):
-            """
-            将 UTC 时间转换为 Asia/Shanghai 时区
-            """
-            try:
-                utc_dt = datetime.strptime(utc_time, "%Y-%m-%dT%H:%M:%S.%fZ")
-                utc_dt = utc_dt.replace(tzinfo=pytz.utc)
-                shanghai_tz = pytz.timezone("Asia/Shanghai")
-                return utc_dt.astimezone(shanghai_tz).strftime("%Y-%m-%d %H:%M:%S")
-            except Exception:
-                return "Unknown"
-
-        # 读取镜像列表文件
-        image_list_file = os.getenv("IMAGE_LIST_FILE")
-        last_update_file_dir = os.getenv("LAST_UPDATE_FILE_DIR")
-        webhook_url = os.getenv("WEBHOOK_URL")
-
-        if not os.path.exists(image_list_file):
-            raise FileNotFoundError(f"Image list file {image_list_file} not found.")
-        with open(image_list_file, "r") as f:
-            images = [line.strip() for line in f if line.strip() and not line.startswith("#")]
-
-        # 确保存储镜像更新时间的目录存在
-        if not os.path.exists(last_update_file_dir):
-            os.makedirs(last_update_file_dir)
-
-        # Docker 登录（如果有私库镜像）
-        docker_username = os.getenv("DOCKER_USERNAME")
-        docker_password = os.getenv("DOCKER_PASSWORD")
-        if docker_username and docker_password:
-            try:
-                subprocess.run(
-                    ["docker", "login", "-u", docker_username, "-p", docker_password],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                print("Docker login successful.")
-            except subprocess.CalledProcessError as e:
-                print(f"Docker login failed: {e.stderr}")
-
-        # 遍历镜像列表
-        for line in images:
-            if line.startswith("--platform"):
-                parts = line.split(" ")
-                platform = parts[1]
-                image = parts[2]
-            else:
-                platform = None
-                image = line
-
-            last_update_file = os.path.join(last_update_file_dir, image.replace("/", "_").replace(":", "_") + ".txt")
-
-            # 获取镜像更新时间
-            update_info = get_last_updated(image, platform)
-            if not update_info:
-                print(f"[ERROR] Failed to fetch update info for {image}. Skipping.")
-                continue
-
-            last_updated = update_info.get("last_updated", "Unknown")
-            digest = update_info.get("digest", "Unknown")
-
-            # 将更新时间转换为 Asia/Shanghai 时区
-            shanghai_time = convert_to_shanghai_time(last_updated)
-
-            # 检查是否有更新
-            if os.path.exists(last_update_file):
-                with open(last_update_file, "r") as f:
-                    last_checked = f.read().strip()
-            else:
-                last_checked = None
-
-            # 打印日志
-            if last_checked != last_updated:
-                print(f"[UPDATED] Image: {image}")
-                print(f"  Digest: {digest}")
-                print(f"  Last Updated (UTC): {last_updated}")
-                print(f"  Last Updated (Shanghai): {shanghai_time}")
-                with open(last_update_file, "w") as f:
-                    f.write(last_updated)
-
-                # 发送通知
-                if webhook_url:
-                    payload = {
-                        "msgtype": "text",
-                        "text": {
-                            "content": f"[UPDATED] Image: {image}\nDigest: {digest}\nLast Updated (Shanghai): {shanghai_time}"
-                        }
-                    }
-                    headers = {"Content-Type": "application/json"}
-                    resp = requests.post(webhook_url, data=json.dumps(payload), headers=headers)
-                    if resp.status_code != 200:
-                        print(f"[ERROR] Failed to send webhook for {image}: {resp.status_code} {resp.text}")
-            else:
-                print(f"[NO CHANGE] Image: {image}")
-                print(f"  Digest: {digest}")
-                print(f"  Last Updated (UTC): {last_updated}")
-                print(f"  Last Updated (Shanghai): {shanghai_time}")
-        EOF
+      - name: Check Docker Hub updates
+        run: |
+          python .github/scripts/check_updates.py
+        
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add last_updated/ logs/
+          git commit -m "Update last_updated timestamps" || echo "No changes to commit"
+          git push
+        
