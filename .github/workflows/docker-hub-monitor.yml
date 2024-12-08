@@ -2,14 +2,11 @@ name: Docker Hub Image Monitor
 
 on:
   schedule:
-    - cron: '0 */12 * * *'  # 每12小时执行一次
-  workflow_dispatch:  # 支持手动触发
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
 
-env:
-  WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}  # 企业微信机器人webhook地址
-  EMAIL_TO: ${{ secrets.EMAIL_TO }}        # 接收通知的邮箱地址
-  EMAIL_FROM: ${{ secrets.EMAIL_FROM }}    # 发送通知的邮箱地址
-  EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}  # 邮箱密码
+permissions:
+  contents: write
 
 jobs:
   check-updates:
@@ -17,6 +14,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}  # 使用 PAT 进行checkout
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,9 +27,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests python-dateutil
 
-      - name: Check Docker Hub updates
+      - name: Create necessary directories and files
         run: |
-          python scripts/check_updates.py
+          mkdir -p last_updated logs
+          if [ ! -f images.txt ]; then
+            echo "nginx" > images.txt
+            echo "cloudnas/clouddrive2" >> images.txt
+            echo "linuxserver/transmission:4.0.5" >> images.txt
+          fi
+
+      - name: Check Docker Hub updates
+        run: python scripts/check_updates.py
         
       - name: Commit changes
         run: |
@@ -38,9 +45,9 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add images.txt last_updated/ logs/
           git commit -m "Update check results and changelog" || echo "No changes to commit"
+          
       - name: Push changes
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.PAT }}
           branch: ${{ github.ref }}
-        
