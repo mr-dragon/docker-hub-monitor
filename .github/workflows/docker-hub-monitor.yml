@@ -1,4 +1,5 @@
-name: Monitor Docker Hub Image Updates
+#name: Monitor Docker Hub Image Updates
+name: 监控Docker Hub镜像更新
 
 on:
   schedule:
@@ -26,8 +27,8 @@ jobs:
         IMAGE_LIST_FILE: "imagex.txt" # 镜像列表文件
         LAST_UPDATE_FILE_DIR: ".last_updates" # 存储镜像更新时间
         WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }} # 企业微信或其他 Webhook
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }} # Docker Hub 用户名
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }} # Docker Hub 密码
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME || '' }} # Docker Hub 用户名（可选）
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD || '' }} # Docker Hub 密码（可选）
       run: |
         python <<EOF
         import os
@@ -68,7 +69,16 @@ jobs:
         docker_username = os.getenv("DOCKER_USERNAME")
         docker_password = os.getenv("DOCKER_PASSWORD")
         if docker_username and docker_password:
-            subprocess.run(["docker", "login", "-u", docker_username, "-p", docker_password], check=True)
+            try:
+                subprocess.run(
+                    ["docker", "login", "-u", docker_username, "-p", docker_password],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print("Docker login successful.")
+            except subprocess.CalledProcessError as e:
+                print(f"Docker login failed: {e.stderr}")
 
         # 遍历镜像列表
         for line in images:
@@ -111,7 +121,7 @@ jobs:
                     resp = requests.post(webhook_url, data=json.dumps(payload), headers=headers)
                     if resp.status_code != 200:
                         print(f"Failed to send webhook for {image}: {resp.status_code} {resp.text}")
-                print(f"Updated detected for {image}: {last_updated}")
+                print(f"Update detected for {image}: {last_updated}")
             else:
                 print(f"No updates for {image}.")
         EOF
