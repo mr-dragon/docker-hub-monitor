@@ -34,6 +34,19 @@
 
 编辑 `images.txt` 文件，每行添加一个要监控的镜像，例如：
 
+```txt
+6053537/portainer-ce
+linuxserver/transmission:4.0.5
+nevinee/qbittorrent:4.3.9
+jxxghp/moviepilot-v2
+imaliang/cloud-media-sync
+iyuucn/iyuuplus-dev:latest
+advplyr/audiobookshelf:latest
+hslr/sun-panel:latest
+0nlylty/dockercopilot:UGREEN
+
+```
+
 ## 配置通知（可选）
 
 ### 企业微信通知
