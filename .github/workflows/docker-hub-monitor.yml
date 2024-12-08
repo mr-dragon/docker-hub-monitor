@@ -30,7 +30,7 @@ jobs:
 
       - name: Check Docker Hub updates
         run: |
-          python .github/scripts/check_updates.py
+          python scripts/check_updates.py
         
       - name: Commit changes
         run: |
