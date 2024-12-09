@@ -2,7 +2,7 @@
 
 一个用于监控 Docker Hub 镜像更新的自动化工具。通过 GitHub Actions 定期检查指定的 Docker 镜像是否有更新，并记录更新日志。
 
-一直以来 Github自带版本更新提醒的功能，但 DockerHub 没有，于是有了本项目：DockerHub镜像更新提醒。
+> 一直以来 Github自带版本更新提醒的功能，但 DockerHub 没有，于是有了本项目：DockerHub镜像更新提醒。
 
 ## 功能特点
 
@@ -17,7 +17,7 @@
 
 ### 1. 复制此仓库
 
-点击 "Use this template" 按钮创建你自己的仓库，或者直接 fork 此仓库。
+直接 fork 此仓库，设置环境变量后，运行 action 即可。
 
 ### 2. 配置 Personal Access Token
 
@@ -76,7 +76,7 @@ hslr/sun-panel:latest
 
 ## 配置通知（可选）
 
-### 企业微信通知
+### 企业微信机器人通知(其他机器人通用)
 
 1. 在企业微信群中添加机器人：
    - 进入群聊 -> 点击右上角设置图标
@@ -123,6 +123,7 @@ hslr/sun-panel:latest
 ```
 
 #### 邮件通知
+
 邮件主题：Docker镜像更新通知
 邮件内容格式与企业微信通知相同
 
