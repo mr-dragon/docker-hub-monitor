@@ -12,7 +12,7 @@ ddsderek/xiaoya-emd:latest
 6053537/portainer-ce
 linuxserver/transmission:4.0.5
 nevinee/qbittorrent:4.3.9
-nevinee/qbittorrent:4.6.7
+#nevinee/qbittorrent:4.6.7
 jxxghp/moviepilot-v2
 imaliang/cloud-media-sync
 iyuucn/iyuuplus-dev:latest
