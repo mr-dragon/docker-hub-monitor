@@ -7,6 +7,7 @@ import smtplib
 import pytz  # 添加时区支持
 from email.mime.text import MIMEText
 from email.header import Header
+import logging
 
 def read_images():
     # 直接从工作目录读取
@@ -183,9 +184,12 @@ def main():
     generate_changelog(images_status)
 
     # 发送通知（如果配置了的话）
-    if updates and os.getenv('WEBHOOK_URL'):
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    webhook_url = os.getenv('WEBHOOK_URL')  # 提取 WEBHOOK_URL
+    logging.info(f"Webhook URL: {webhook_url}")  # 临时打印日志
+    if updates and webhook_url:
         notification = "\n\n".join(updates)
-        send_wecom_notification(os.getenv('WEBHOOK_URL'), notification)
+        send_wecom_notification(webhook_url, notification)
     
     if updates and os.getenv('EMAIL_TO'):
         notification = "\n\n".join(updates)
